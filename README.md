@@ -1,4 +1,4 @@
-# <img src=".github/assets/logo.png" alt="Eagler Console Logo" align="right" width="100px">Eagler Console v1.1
+# <img src=".github/assets/logo.png" alt="Eagler Console Logo" align="right" width="100px">Eagler Console v1.2
  A script to add controller support to eaglercraft!<br>
  Currently in very early testing/development. Using some of FlamedDogo's eaglermobile code!
 
@@ -6,6 +6,7 @@
 <hr>
 
  ## Versions
+ __v1.2__ - Better camera control, and trigger activation!<br>
  __v1.1__ - Now with camera support! (Made by radmanplays)<br>
  __v1.0__ - Rough outline for future!<br>
 
@@ -30,7 +31,7 @@
 - [ ] Limit code activation
 - [ ] Add tooltips
 - [ ] Config file for features
-- [ ] Remove unnecessary code
+- [x] Remove unnecessary code
 
 </details>
 
