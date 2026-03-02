@@ -10,22 +10,8 @@ try {
         value: window
     }); // If this is plain javascript, use window
 }
-clientWindow.console.log("Eagler Console v1.0.0")
-// TODO: remove the mobile check is implement the dynamic enabling and disabling of individual features
-function isMobile() {
-    try {
-        document.createEvent("TouchEvent");
-        return true;
-    } catch (e) {
-        return false;
-    }
-}
-if (!isMobile()) {
-    alert("WARNING: This script was created for controller use, and it will break functionality for keyboard use!");
-}
+clientWindow.console.log("%cEagler Console v1.0.0", "color: #9b918f; font-weight: bold; background-color: #4e4a4c; padding: 0.5vw 2vw;")
 // TODO: consolidate all of these into a single object?
-clientWindow.crouchLock = false; // Used for crouch mobile control
-clientWindow.sprintLock = false; // Used for sprint mobile control
 clientWindow.keyboardFix = false; // keyboardFix ? "Standard Keyboard" : "Compatibility Mode"
 clientWindow.inputFix = false; // If true, Duplicate Mode
 clientWindow.blockNextInput = false; // Used for Duplicate Mode 
@@ -97,14 +83,54 @@ function wheelEvent(element, delta) {
         "wheelDeltaY": delta
     }));
 }
+
+// POINTERLOCK
+// When requestpointerlock is called, this dispatches an event, saves the requested element to window.fakelock, and unhides the touch controls
+window.fakelock = null;
+
+Object.defineProperty(Element.prototype, "requestPointerLock", {
+    value: function() {
+        window.fakelock = this
+        document.dispatchEvent(new Event('pointerlockchange'));
+        setButtonVisibility(true);
+        return true
+    }
+});
+
+
+// Makes pointerLockElement return window.fakelock
+Object.defineProperty(Document.prototype, "pointerLockElement", {
+    get: function() {
+        return window.fakelock;
+    }
+});
+// When exitPointerLock is called, this dispatches an event, clears the
+Object.defineProperty(Document.prototype, "exitPointerLock", {
+    value: function() {
+        window.fakelock = null
+        document.dispatchEvent(new Event('pointerlockchange'));
+        setButtonVisibility(false);
+        return true
+    }
+});
+
 let inGameStyle = false;
 let inMenuStyle = false;
+let chatlog = false;
 
 function setButtonVisibility(pointerLocked) {
-    if (pointerLocked) { inGameStyle = true; inMenuStyle = false; }
-    else { inGameStyle = false; inMenuStyle = true; }
-}
-
+    if (pointerLocked) {
+        inGameStyle = true;
+        inMenuStyle = false;
+        document.getElementById("eccursor").style.display = "none";
+        chatlog = false;
+    }
+    else {
+        inGameStyle = false;
+        inMenuStyle = true;
+        document.getElementById("eccursor").style.display = "block";
+    }
+};
 
 // FULLSCREEN
 clientWindow.fakefull = null;
@@ -179,10 +205,12 @@ function insertCanvasElements() {
 
     let controllerIndex = null;
 
-    let jleftPressed = false;
-    let jrightPressed = false;
-    let jupPressed = false;
-    let jdownPressed = false;
+    let ljsleftPressed = false;
+    let ljsrightPressed = false;
+    let ljsupPressed = false;
+    let ljsdownPressed = false;
+    let rjsupPressed = false;
+    let rjsdownPressed = false;
 
     let leftPressed = false;
     let rightPressed = false;
@@ -211,66 +239,72 @@ function insertCanvasElements() {
     let drop = false;
     let chat = false;
     let jump = false;
+    let zoom = false;
     let inventory1 = false;
-    let inventory2 = false;
     let lefthotbar = false;
     let righthotbar = false;
     let pause = false;
     let players = false;
+    let exit = false;
+    let scrollup = false;
+    let scrolldown = false;
 
     let rHorizontalValue = 0;
     let rVerticalValue = 0;
-
+    let leftRightValue = 0;
+    let upDownValue = 0;
+    let sizex = window.innerWidth / 2;
+    let sizey = window.innerHeight / 2;
 
     window.addEventListener("gamepadconnected", (event) => {
         controllerIndex = event.gamepad.index;
-        console.log("Controller Connected!");
+        console.log("%cController Connected!", "color: #9b918f; font-weight: bold; background-color: #4e4a4c; padding: 0.5vw 2vw;");
+        const eccursor = document.createElement("div");
+        eccursor.id = "eccursor";
+        document.body.appendChild(eccursor);
+        canvas.style.cursor = "none";
+        setButtonVisibility(false);
     });
 
-    window.addEventListener("gamepaddisconnected", (event) => {
-        console.log("Controller Disconnected!");
+    window.addEventListener("gamepaddisconnected", () => {
+        console.log("%cController Disconnected!", "color: #9b918f; font-weight: bold; background-color: #4e4a4c; padding: 0.5vw 2vw;");
         controllerIndex = null;
+        canvas.style.cursor = "default";
+        document.getElementById("eccursor").remove();
     });
 
     function controllerInput() {
-        if (controllerIndex !== null) {
+        if (controllerIndex !== null) {            
             const gamepad = navigator.getGamepads()[controllerIndex];
             const buttons = gamepad.buttons;
-
             const stickDeadZone = 0.4;
 
-            // Left joystick axes (used for player movement)
-            const leftRightValue = gamepad.axes[0];
-            const upDownValue = gamepad.axes[1];
+            // Joystick Axes
+            leftRightValue = gamepad.axes[0];
+            upDownValue = gamepad.axes[1];
+            rHorizontalValue = gamepad.axes[2];
+            rVerticalValue = gamepad.axes[3];
 
-            // Right joystick axes (used for camera rotation)
-            rHorizontalValue = gamepad.axes[2];  // Horizontal movement of right joystick
-            rVerticalValue = gamepad.axes[3];    // Vertical movement of right joystick
+            // Handles Player Movement
+            if (leftRightValue >= stickDeadZone) {ljsrightPressed = true;}
+            else if (leftRightValue <= stickDeadZone) {ljsrightPressed = false;}
+            if (leftRightValue <= -stickDeadZone) {ljsleftPressed = true;}
+            else if (leftRightValue >= -stickDeadZone) {ljsleftPressed = false;}
 
-            // Handle left joystick
-            if (leftRightValue >= stickDeadZone) {
-                jrightPressed = true;
-            } else if (leftRightValue <= stickDeadZone) {
-                jrightPressed = false;
-            }
-            if (leftRightValue <= -stickDeadZone) {
-                jleftPressed = true;
-            } else if (leftRightValue >= -stickDeadZone) {
-                jleftPressed = false;
-            }
+            if (upDownValue >= stickDeadZone) {ljsdownPressed = true;}
+            else if (upDownValue <= stickDeadZone) {ljsdownPressed = false;}
+            if (upDownValue <= -stickDeadZone) {ljsupPressed = true;}
+            else if (upDownValue >= -stickDeadZone) {ljsupPressed = false;}
 
-            if (upDownValue >= stickDeadZone) {
-                jdownPressed = true;
-            } else if (upDownValue <= stickDeadZone) {
-                jdownPressed = false;
-            }
-            if (upDownValue <= -stickDeadZone) {
-                jupPressed = true;
-            } else if (upDownValue >= -stickDeadZone) {
-                jupPressed = false;
+            // Handles UI Scrolling
+            if (inMenuStyle === true) {
+                if (rVerticalValue >= stickDeadZone) {rjsdownPressed = true;}
+                else if (rVerticalValue <= stickDeadZone) {rjsdownPressed = false;}
+                if (rVerticalValue <= -stickDeadZone) {rjsupPressed = true;}
+                else if (rVerticalValue >= -stickDeadZone) {rjsupPressed = false;}
             }
 
-            // Handle button presses
+            // Handle Button Presses
             greenPressed = buttons[0].pressed;
             redPressed = buttons[1].pressed;
             bluePressed = buttons[2].pressed;
@@ -294,14 +328,10 @@ function insertCanvasElements() {
         }
     }
     function rotateCamera() {
-        const sensitivity = 20;
+        const sensitivity = 14;
         if (rHorizontalValue >= 0.12 || rVerticalValue >= 0.12) {
             let movementX = rHorizontalValue * sensitivity;
             let movementY = rVerticalValue * sensitivity;
-            console.log(movementX);
-            console.log(movementY);
-
-            let canvas = document.querySelector('canvas');
             canvas.dispatchEvent(new MouseEvent("mousemove", {
                 "movementX": movementX,
                 "movementY": movementY
@@ -310,66 +340,118 @@ function insertCanvasElements() {
         else if (rHorizontalValue <= -0.12 || rVerticalValue <= -0.12) {
             let movementX = rHorizontalValue * sensitivity;
             let movementY = rVerticalValue * sensitivity;
-            console.log(movementX);
-            console.log(movementY);
-
-            let canvas = document.querySelector('canvas');
             canvas.dispatchEvent(new MouseEvent("mousemove", {
                 "movementX": movementX,
                 "movementY": movementY
             }));
         }
-    }
+    };
+
+    function moveCursor() {
+        const gamepad = navigator.getGamepads()[controllerIndex];
+        const lx = gamepad.axes[0] || 0, ly = gamepad.axes[1] || 0;
+        const dz = 0.18;
+        const dx = Math.abs(lx) > dz ? lx : 0;
+        const dy = Math.abs(ly) > dz ? ly : 0;
+        window.addEventListener('resize', () => {
+            sizex = Math.max(0, Math.min(window.innerWidth, sizex));
+            sizey = Math.max(0, Math.min(window.innerHeight, sizey));
+        });
+        sizex += dx * 8;
+        sizey += dy * 8;
+        sizex = Math.max(0, Math.min(window.innerWidth, sizex));
+        sizey = Math.max(0, Math.min(window.innerHeight, sizey));
+        document.getElementById("eccursor").style.left = sizex + 'px';
+        document.getElementById("eccursor").style.top = sizey + 'px';
+        canvas.dispatchEvent(new MouseEvent("mousemove", {
+            "clientX": sizex,
+            "clientY": sizey
+        }));
+    };
+
+    function simulateClick(scclientX, scclientY, scwhich = 'left', scshift = false) {
+        const button = scwhich === 'left' ? 0 : scwhich === 'right' ? 2 : 1;
+        const mouseOpts = {
+            clientX: scclientX, clientY: scclientY, bubbles: true, button, shiftKey: scshift
+        };
+        canvas.dispatchEvent(new MouseEvent('mousedown', mouseOpts));
+        setTimeout(() => {
+            if (scwhich === 'left') {
+                canvas.dispatchEvent(new MouseEvent('click', mouseOpts));
+                canvas.dispatchEvent(new MouseEvent('mouseup', mouseOpts));
+            }
+            if (scwhich === 'right') {
+                canvas.dispatchEvent(new MouseEvent('contextmenu', mouseOpts));
+            }
+        }, 10);
+    };
 
     function movePlayer() {
-        if (jupPressed) { console.log("W"); keyEvent("w", "keydown"); }
-        else if (!jupPressed) { keyEvent("w", "keyup"); }
-        if (jleftPressed) { console.log("A"); keyEvent("a", "keydown"); }
-        else if (!jleftPressed) { keyEvent("a", "keyup"); }
-        if (jdownPressed) { console.log("S"); keyEvent("s", "keydown"); }
-        else if (!jdownPressed) { keyEvent("s", "keyup"); }
-        if (jrightPressed) { console.log("D"); keyEvent("d", "keydown"); }
-        else if (!jrightPressed) { keyEvent("d", "keyup"); }
+        if (inGameStyle === true) {
+            if (ljsupPressed) { keyEvent("w", "keydown"); }
+            else if (!ljsupPressed) { keyEvent("w", "keyup"); }
+            if (ljsleftPressed) { keyEvent("a", "keydown"); }
+            else if (!ljsleftPressed) { keyEvent("a", "keyup"); }
+            if (ljsdownPressed) { keyEvent("s", "keydown"); }
+            else if (!ljsdownPressed) { keyEvent("s", "keyup"); }
+            if (ljsrightPressed) { keyEvent("d", "keydown"); }
+            else if (!ljsrightPressed) { keyEvent("d", "keyup"); }
 
-        if (greenPressed && jump) { console.log("Spacebar"); keyEvent(" ", "keydown"); jump = false; }
-        else if (!greenPressed) { keyEvent(" ", "keyup"); jump = true; }
-        if (redPressed) { console.log("Crouch1"); keyEvent("shift", "keydown"); }
-        else if (!redPressed) { keyEvent("shift", "keyup"); }
-        if (bluePressed && inventory1) { console.log("Inventory1"); keyEvent("e", "keydown"); inventory1 = false; }
-        else if (!bluePressed) { keyEvent("e", "keyup"); inventory1 = true; }
-        if (yellowPressed && inventory2) { console.log("Inventory2"); keyEvent("e", "keydown"); inventory2 = false; }
-        else if (!yellowPressed) { keyEvent("e", "keyup"); inventory2 = true; }
+            if (greenPressed) { keyEvent(" ", "keydown"); jump = false; }
+            else if (!greenPressed) { keyEvent(" ", "keyup"); jump = true; }
+            if (bluePressed && zoom) { keyEvent("c", "keydown"); zoom = false; }
+            else if (!bluePressed) { keyEvent("c", "keyup"); zoom = true; }
+            if (yellowPressed && inventory1) { keyEvent("e", "keydown"); inventory1 = false; }
+            else if (!yellowPressed) { keyEvent("e", "keyup"); inventory1 = true; }
 
-        if (lbPressed && lefthotbar) { console.log("Left1"); wheelEvent(canvas, 10); lefthotbar = false; }
-        else if (!lbPressed) { lefthotbar = true; }
-        if (rbPressed && righthotbar) { console.log("Right1"); wheelEvent(canvas, -10); righthotbar = false; }
-        else if (!rbPressed) { righthotbar = true; }
-        if (ltPressed) { if (ltpress) { ltpress = false; console.log("Place"); mouseEvent(2, "mousedown", canvas) } }
-        else if (!ltPressed) { mouseEvent(2, "mouseup", canvas); ltpress = true; }
-        if (rtPressed) { if (rtpress) { rtpress = false; console.log("Break"); mouseEvent(0, "mousedown", canvas) } }
-        else if (!rtPressed) { mouseEvent(0, "mouseup", canvas); rtpress = true }
+            if (lbPressed && lefthotbar) { wheelEvent(canvas, 10); lefthotbar = false; }
+            else if (!lbPressed) { lefthotbar = true; }
+            if (rbPressed && righthotbar) { wheelEvent(canvas, -10); righthotbar = false; }
+            else if (!rbPressed) { righthotbar = true; }
+            if (ltPressed && ltpress) { mouseEvent(2, "mousedown", canvas); ltpress = false; }
+            else if (!ltPressed) { mouseEvent(2, "mouseup", canvas); ltpress = true; }
+            if (rtPressed && rtpress) { mouseEvent(0, "mousedown", canvas); rtpress = false; }
+            else if (!rtPressed) { mouseEvent(0, "mouseup", canvas); rtpress = true; }
 
-        if (pausePressed && pause) { console.log("Pause"); keyEvent("`", "keydown"); pause = false; }
-        else if (!pausePressed) { keyEvent("`", "keyup"); pause = true; }
-        if (selectPressed && players) { console.log("Tab"); keyEvent("tab", "keydown"); players = false; }
-        else if (!selectPressed) { keyEvent("Tab", "keyup"); players = true; }
-        if (ljsPressed) { console.log("Sprint"); keyEvent("r", "keydown"); }
-        else if (!ljsPressed) { keyEvent("r", "keyup"); }
-        if (rjsPressed) { console.log("Crouch2"); keyEvent("shift", "keydown"); }
-        else if (!rjsPressed) { keyEvent("shift", "keyup"); }
+            if (pausePressed && pause) { keyEvent("`", "keydown"); pause = false; }
+            else if (!pausePressed) { keyEvent("`", "keyup"); pause = true; }
+            if (selectPressed && players) { keyEvent("tab", "keydown"); players = false; }
+            else if (!selectPressed) { keyEvent("Tab", "keyup"); players = true; }
+            if (ljsPressed) { keyEvent("r", "keydown"); }
+            else if (!ljsPressed) { keyEvent("r", "keyup"); }
+            if (rjsPressed || redPressed) { keyEvent("shift", "keydown"); }
+            else if (!rjsPressed || !redPressed) { keyEvent("shift", "keyup"); }
 
-        if (upPressed && perspective) { console.log("Perspective"); keyEvent("f5", "keydown"); perspective = false; }
-        else if (!upPressed && !perspective) { keyEvent("f5", "keyup"); perspective = true; }
-        if (leftPressed && debug) { console.log("Debug"); keyEvent("f3", "keydown"); debug = false; }
-        else if (!leftPressed) { keyEvent("f3", "keyup"); debug = true; }
-        if (downPressed && drop) { console.log("Drop"); keyEvent("q", "keydown"); drop = false; }
-        else if (!downPressed) { keyEvent("q", "keyup"); drop = true; }
-        if (rightPressed && chat) { console.log("Chat"); keyEvent("t", "keydown"); chat = false; }
-        else if (!rightPressed) { keyEvent("t", "keyup"); chat = true; }
+            if (upPressed && perspective) { keyEvent("f5", "keydown"); perspective = false; }
+            else if (!upPressed) { keyEvent("f5", "keyup"); perspective = true; }
+            if (leftPressed && debug) { keyEvent("f3", "keydown"); debug = false; }
+            else if (!leftPressed) { keyEvent("f3", "keyup"); debug = true; }
+            if (downPressed && drop) { keyEvent("q", "keydown"); drop = false; }
+            else if (!downPressed) { keyEvent("q", "keyup"); drop = true; }
+            if (rightPressed && chat) { keyEvent("t", "keydown"); chat = false; chatlog = true; }
+            else if (!rightPressed) { keyEvent("t", "keyup"); chat = true; }
+        }
+
+        if (inMenuStyle === true) {
+            if (greenPressed && jump) { simulateClick(sizex, sizey, 'left', yellowPressed); jump = false; }
+            else if (!greenPressed) { jump = true; }
+            if (!chatlog) {
+                if (redPressed && exit) { keyEvent("`", "keydown"); exit = false}
+                else if (!redPressed) { keyEvent("`", "keyup"); exit = true;}
+            }
+            if (bluePressed && zoom) { simulateClick(sizex, sizey, 'right', yellowPressed); zoom = false; }
+            else if (!bluePressed) { zoom = true; }
+
+            if (rjsupPressed && scrollup) { wheelEvent(canvas, 10); scrollup = false; }
+            else if (!rjsupPressed) { scrollup = true; }
+            if (rjsdownPressed && scrolldown) { wheelEvent(canvas, -10); scrolldown = false; }
+            else if (!rjsdownPressed) { scrolldown = true; }
+        }
     }
 
     function gameLoop() {
-        rotateCamera();
+        if (inGameStyle === true) {rotateCamera();}
+        if (inMenuStyle === true) {moveCursor();}
         controllerInput();
         movePlayer();
         requestAnimationFrame(gameLoop);
@@ -380,28 +462,41 @@ function insertCanvasElements() {
 // CSS for touch screen buttons, along with fixing iOS's issues with 100vh ignoring the naviagtion bar, and actually disabling zoom because safari ignores user-scalable=no :(
 let customStyle = document.createElement("style");
 customStyle.textContent = `
-  html, body, canvas {
-      height: 100svh !important;
-      height: -webkit-fill-available !important;
-      touch-action: pan-x pan-y;
-      -webkit-touch-callout: none;
-      -webkit-user-select: none;
-      -khtml-user-select: none;
-      -moz-user-select: none;
-      -ms-user-select: none;
-      user-select: none;
-      outline: none;
-      -webkit-tap-highlight-color: rgba(255, 255, 255, 0);
-  }
-  #fileUpload {
-      position: absolute;
-      left: 0;
-      right: 100vw;
-      top: 0; 
-      bottom: 100vh;
-      width: 100vw;
-      height: 100vh;
-      background-color:rgba(255,255,255,0.5);
-  }
-  `;
+    html, body, canvas {
+        height: 100svh !important;
+        height: -webkit-fill-available !important;
+        touch-action: pan-x pan-y;
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        -khtml-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+        outline: none;
+        -webkit-tap-highlight-color: rgba(255, 255, 255, 0);
+    }
+    #fileUpload {
+        position: absolute;
+        left: 0;
+        right: 100vw;
+        top: 0;
+        bottom: 100vh;
+        width: 100vw;
+        height: 100vh;
+        background-color:rgba(255,255,255,0.5);
+    }
+    #eccursor {
+        display: none;
+        position: absolute;
+        width: 2.5vw;
+        height: 2.5vw;
+        z-index: 2;
+        top: 50vh;
+        left: 50vw;
+        transform: translate(-50%, -50%);
+        background: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABEUlEQVR4AeyUWQ7DIAxEce9/ZzqPCIlQHLaPKhKIYbHNeGpSPmGvRR0Hmtb6joCoFoBSL4vYEaC8+/0IOBU4FXhtBVoPT8vWfShWKqDHL+YXMCWQIe+nRcwKUC4/h5wI8gPwVpgRIP6L28yC2S/gVlCaGEaQBcDcQ81nMpTQ9tZ7fPgDAiT6ulMt0l16843+YeOdr+2iiAjQ/L+OAFNr3mltH5VZn/P24jMEaA7lXXpr4kpwhyVKH2uPp7Snb4DgEeiHcDa43wkkCkoTwwhyBUZiiRH/JYJNDTkx+QF4K8wK4LjyWNDAOoE10MaEqb4igAStRC0bsY9YFfBIOuM8Ak4FTgVeXQE9fpZfRPP++z37FwAA//+PVAMWAAAABklEQVQDACXOkD99mCgPAAAAAElFTkSuQmCC) center no-repeat;
+        background-size: cover;
+        image-rendering: pixilated;
+    }
+`;
 document.documentElement.appendChild(customStyle);
